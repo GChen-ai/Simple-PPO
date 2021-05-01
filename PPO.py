@@ -54,7 +54,7 @@ class Model(nn.Module):
         return logprobs.detach(),action.detach()
     
 class PPO:
-    def __init__(self,gamma,actor_lr,critic_lr,clip_eps,update_epoch,state_dim,action_dim):
+    def __init__(self,state_dim,action_dim,gamma=0.99,actor_lr=0.003,critic_lr=0.001,clip_eps=0.2,update_epoch=200):
         self.gamma=gamma
         self.clip_eps=clip_eps
         self.update_epoch=update_epoch
@@ -103,6 +103,9 @@ class PPO:
         self.buffer.clear()
     def save(self,path):
         torch.save(self.policy_old.state_dict(),path+'policy.pth')
+    def load(self,path):
+        self.policy.load_state_dict(torch.load(path+'policy.pth'))
+        self.policy_old.load_state_dict(torch.load(path+'policy.pth'))
             
             
     

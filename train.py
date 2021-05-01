@@ -22,7 +22,7 @@ env=gym.make(env_name)
 state_dim=env.observation_space.shape[0]
 action_dim=env.action_space.n
 
-agent=PPO(gamma,actor_lr,critic_lr,eps_clip,update_epochs,state_dim,action_dim)
+agent=PPO(state_dim,action_dim,gamma,actor_lr,critic_lr,eps_clip,update_epochs)
 step_reward=0
 steps=0
 for step in range(1,max_training_timesteps):
@@ -45,3 +45,4 @@ for step in range(1,max_training_timesteps):
         print('steps:  %d, avg reward:  %.2f'%(step,avg_reward))
         step_reward=0
         steps=0
+env.close()
