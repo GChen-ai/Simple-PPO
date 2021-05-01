@@ -39,7 +39,7 @@ class Model(nn.Module):
             nn.ReLU(),
             nn.Linear(128,1)
         )
-    def forward(self,state,action):
+    def evaluate(self,state,action):
         action_prob=self.actor(state)
         dist=torch.distributions.Categorical(action_prob)
         logprobs=dist.log_prob(action)
@@ -52,7 +52,8 @@ class Model(nn.Module):
         action=dist.sample()
         logprobs=dist.log_prob(action)
         return logprobs.detach(),action.detach()
-    
+    def forward(self):
+        raise NotImplementedError
 class PPO:
     def __init__(self,state_dim,action_dim,gamma=0.99,actor_lr=0.003,critic_lr=0.001,clip_eps=0.2,update_epoch=200):
         self.gamma=gamma
@@ -63,11 +64,12 @@ class PPO:
         self.policy_old.load_state_dict(self.policy.state_dict())
         self.buffer=Buffer()
         self.mse=nn.MSELoss()
-        self.actor_opt=torch.optim.Adam(self.policy_old.actor.parameters(),actor_lr)
-        self.critic_opt=torch.optim.Adam(self.policy_old.critic.parameters(),critic_lr)
+        self.actor_opt=torch.optim.Adam(self.policy.actor.parameters(),actor_lr)
+        self.critic_opt=torch.optim.Adam(self.policy.critic.parameters(),critic_lr)
+        
     def select_action(self,state):
-        state=torch.FloatTensor(state).to(device)
         with torch.no_grad():
+            state=torch.FloatTensor(state).to(device)
             logprob,action=self.policy_old.act(state)
         self.buffer.logprobs.append(logprob)
         self.buffer.actions.append(action)
@@ -79,21 +81,21 @@ class PPO:
         for reward,t in zip(reversed(self.buffer.rewards),reversed(self.buffer.terminal)):
             if t:
                 sum_reward=0
-            reward+=sum_reward*self.gamma
-            rewards.insert(0,reward)
+            sum_reward=reward+sum_reward*self.gamma
+            rewards.insert(0,sum_reward)
         rewards=torch.FloatTensor(rewards).to(device)
         rewards=(rewards-torch.mean(rewards))/(torch.std(rewards)+1e-8)
         old_states=torch.squeeze(torch.stack(self.buffer.states,dim=0)).detach().to(device)
         old_logprobs=torch.squeeze(torch.stack(self.buffer.logprobs,dim=0)).detach().to(device)
         old_acitons=torch.squeeze(torch.stack(self.buffer.actions,dim=0)).detach().to(device)
         for e in range(self.update_epoch):
-            logprobs,entropy,values=self.policy(old_states,old_acitons)
+            logprobs,entropy,values=self.policy.evaluate(old_states,old_acitons)
             r=torch.exp(logprobs-old_logprobs)
             values=torch.squeeze(values)
             advantages=rewards-values.detach()
             arr1=r*advantages
             arr2=torch.clamp(r,1-self.clip_eps,1+self.clip_eps)*advantages
-            loss=-torch.min(arr1,arr2)+0.5*self.mse(values,rewards)-0.05*entropy
+            loss=-torch.min(arr1,arr2)+0.5*self.mse(values,rewards)-0.01*entropy
             self.actor_opt.zero_grad()
             self.critic_opt.zero_grad()
             loss.mean().backward()

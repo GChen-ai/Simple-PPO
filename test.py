@@ -6,7 +6,7 @@ from PPO import PPO
 
 save_path='models/'
 env_name="CartPole-v1"
-max_testing_epoch=100
+max_testing_epoch=30
 render=True
 
 env=gym.make(env_name)
